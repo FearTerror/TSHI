@@ -12,12 +12,12 @@ def main_menu():
     Rozmich = types.KeyboardButton("Розміщення магазинів на мапі")
     SaleProp = types.KeyboardButton("Акційні пропозиції")
     Subscribes = types.KeyboardButton("Підписка на акційні пропозиції")
-    Knopka5 = types.KeyboardButton("For task")
+    #Knopka5 = types.KeyboardButton("For task")
     #menu.add(Zamov)
     #menu.row(Rozmich, SaleProp, Subscribes)
-    #menu.add(Zamov, Rozmich, SaleProp, Subscribes)
-    menu.add(Zamov, Rozmich)
-    menu.row(SaleProp, Subscribes, Knopka5)
+    menu.add(Zamov, Rozmich, SaleProp, Subscribes)
+    #menu.add(Zamov, Rozmich)
+    #menu.row(SaleProp, Subscribes, Knopka5)
 
     return menu
 
