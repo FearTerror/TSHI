@@ -36,8 +36,8 @@ def main_menu():
     menu.add(types.KeyboardButton("Підписка на акційні пропозиції"))
     menu.add(types.KeyboardButton("Додавання продуктів"))
     menu.add(types.KeyboardButton("Перегляд фруктів"))
-    menu.add(types.KeyboardButton("Погода"))
-    menu.add(types.KeyboardButton("Пошук у Вікіпедії"))
+    # menu.add(types.KeyboardButton("Погода"))
+    # menu.add(types.KeyboardButton("Пошук у Вікіпедії"))
     return menu
 
 @bot.message_handler(func=lambda message: message.text == "Замовлення продуктів")
@@ -173,55 +173,55 @@ def help_command(message):
 
 
 #Практ_2
-@bot.message_handler(func=lambda message: message.text == "Погода")
-def weather_menu(message):
-    menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    menu.add("Kyiv", "Lviv", "Odessa")
-    menu.add("Повернутися в головне меню")
-    bot.send_message(message.chat.id, "Виберіть місто для отримання погоди:", reply_markup=menu)
-
-@bot.message_handler(func=lambda message: message.text in ["Kyiv", "Lviv", "Odessa"])
-def get_weather(message):
-    city = message.text
-    try:
-        response = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={'a3b896fb6836a77af72ee79c5b062c4e'}&units=metric&lang=ua")
-        weather_data = response.json()
-        if response.status_code == 200:
-            weather_info = (
-                f"Погода у місті {city}:\n"
-                f"Температура: {weather_data['main']['temp']}°C\n"
-                f"Відчувається як: {weather_data['main']['feels_like']}°C\n"
-                f"Опис: {weather_data['weather'][0]['description']}\n"
-                f"Вологість: {weather_data['main']['humidity']}%\n"
-                f"Швидкість вітру: {weather_data['wind']['speed']} м/с"
-            )
-        else:
-            weather_info = "Не вдалося отримати дані про погоду. Перевірте назву міста."
-        bot.send_message(message.chat.id, weather_info, reply_markup=main_menu())
-    except Exception as e:
-        bot.send_message(message.chat.id, f"Сталася помилка: {e}", reply_markup=main_menu())
-
-@bot.message_handler(func=lambda message: message.text == "Пошук у Вікіпедії")
-def wikipedia_search(message):
-    bot.send_message(message.chat.id, "Введіть запит для пошуку у Вікіпедії:")
-    bot.register_next_step_handler(message, search_wikipedia)
-
-def search_wikipedia(message):
-    query = message.text
-    try:
-        wikipedia.set_lang("uk")
-        page = wikipedia.page(query)
-        summary = wikipedia.summary(query, sentences=3)
-        response = (
-            f"<b>{page.title}</b>\n\n"
-            f"{summary}\n\n"
-            f"Детальніше: {page.url}"
-        )
-        bot.send_message(message.chat.id, response, parse_mode="HTML", reply_markup=main_menu())
-    except wikipedia.exceptions.PageError:
-        bot.send_message(message.chat.id, "Не вдалося знайти статтю. Спробуйте інший запит.", reply_markup=main_menu())
-    except Exception as e:
-        bot.send_message(message.chat.id, f"Сталася помилка: {e}", reply_markup=main_menu())
+# @bot.message_handler(func=lambda message: message.text == "Погода")
+# def weather_menu(message):
+#     menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#     menu.add("Kyiv", "Lviv", "Odessa")
+#     menu.add("Повернутися в головне меню")
+#     bot.send_message(message.chat.id, "Виберіть місто для отримання погоди:", reply_markup=menu)
+#
+# @bot.message_handler(func=lambda message: message.text in ["Kyiv", "Lviv", "Odessa"])
+# def get_weather(message):
+#     city = message.text
+#     try:
+#         response = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={'a3b896fb6836a77af72ee79c5b062c4e'}&units=metric&lang=ua")
+#         weather_data = response.json()
+#         if response.status_code == 200:
+#             weather_info = (
+#                 f"Погода у місті {city}:\n"
+#                 f"Температура: {weather_data['main']['temp']}°C\n"
+#                 f"Відчувається як: {weather_data['main']['feels_like']}°C\n"
+#                 f"Опис: {weather_data['weather'][0]['description']}\n"
+#                 f"Вологість: {weather_data['main']['humidity']}%\n"
+#                 f"Швидкість вітру: {weather_data['wind']['speed']} м/с"
+#             )
+#         else:
+#             weather_info = "Не вдалося отримати дані про погоду. Перевірте назву міста."
+#         bot.send_message(message.chat.id, weather_info, reply_markup=main_menu())
+#     except Exception as e:
+#         bot.send_message(message.chat.id, f"Сталася помилка: {e}", reply_markup=main_menu())
+#
+# @bot.message_handler(func=lambda message: message.text == "Пошук у Вікіпедії")
+# def wikipedia_search(message):
+#     bot.send_message(message.chat.id, "Введіть запит для пошуку у Вікіпедії:")
+#     bot.register_next_step_handler(message, search_wikipedia)
+#
+# def search_wikipedia(message):
+#     query = message.text
+#     try:
+#         wikipedia.set_lang("uk")
+#         page = wikipedia.page(query)
+#         summary = wikipedia.summary(query, sentences=3)
+#         response = (
+#             f"<b>{page.title}</b>\n\n"
+#             f"{summary}\n\n"
+#             f"Детальніше: {page.url}"
+#         )
+#         bot.send_message(message.chat.id, response, parse_mode="HTML", reply_markup=main_menu())
+#     except wikipedia.exceptions.PageError:
+#         bot.send_message(message.chat.id, "Не вдалося знайти статтю. Спробуйте інший запит.", reply_markup=main_menu())
+#     except Exception as e:
+#         bot.send_message(message.chat.id, f"Сталася помилка: {e}", reply_markup=main_menu())
 
 
 # Перевірка бази даних і запуск бота
