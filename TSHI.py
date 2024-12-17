@@ -176,188 +176,67 @@
 #     bot.polling(none_stop=True)
 
 
-import openai
+import telebot
+import easyocr
+import cv2
+import os
 
 
-# Завдання 1: Базовий діалог із ChatGPT з контекстом
-def basic_dialog_with_context(api_key):
-    openai.api_key = api_key
-    dialog_context = [{"role": "system", "content": "You are ChatGPT, a helpful assistant."}]
-
-    while True:
-        user_input = input("User: ")
-        if user_input.lower() == "exit":
-            print("Exiting the chat.")
-            break
-
-        dialog_context.append({"role": "user", "content": user_input})
-
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=dialog_context
-            )
-            assistant_message = response.choices[0].message['content']
-            print("Assistant:", assistant_message)
-
-            dialog_context.append({"role": "assistant", "content": assistant_message})
-        except Exception as e:
-            print("Service temporarily unavailable:", e)
+TOKEN = '8023381722:AAH0zVK7HNjmWaxX9KkogavDDxz4Asr7XLE'
+bot = telebot.TeleBot(TOKEN)
 
 
-# Завдання 2: Система з обмеженим контекстом
-def limited_context_chat(api_key):
-    openai.api_key = api_key
-    dialog_context = [{"role": "system", "content": "You are a limited context assistant."}]
+reader = easyocr.Reader(['en', 'uk'])
 
-    while True:
-        user_input = input("User: ")
-        if user_input.lower() == "exit":
-            print("Exiting the chat.")
-            break
+def recognize_with_easyocr(image_path):
+    image = cv2.imread(image_path)
+    image = cv2.resize(image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    results = reader.readtext(image)
 
-        dialog_context.append({"role": "user", "content": user_input})
-
-        if len(dialog_context) > 6:
-            dialog_context = dialog_context[-6:]
-
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=dialog_context
-            )
-            assistant_message = response.choices[0].message['content']
-            print("Assistant:", assistant_message)
-
-            dialog_context.append({"role": "assistant", "content": assistant_message})
-        except Exception as e:
-            print("Service temporarily unavailable:", e)
+    recognized_text = ""
+    for (bbox, text, prob) in results:
+        recognized_text += f"{text} (Вероятность: {prob:.2f})\n"
+    return recognized_text if recognized_text else "Не удалось распознать текст."
 
 
-# Завдання 3: Чат-бот для технічної підтримки
-def tech_support_chat(api_key):
-    openai.api_key = api_key
-    dialog_context = [{"role": "system", "content": "You are a support assistant specializing in outerwear orders."}]
-
-    while True:
-        user_input = input("User: ")
-        if user_input.lower() == "exit":
-            print("Exiting the chat.")
-            break
-
-        dialog_context.append({"role": "user", "content": user_input})
-
-        if len(dialog_context) > 10:
-            dialog_context = dialog_context[-10:]
-
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=dialog_context
-            )
-            assistant_message = response.choices[0].message['content']
-            print("Assistant:", assistant_message)
-
-            dialog_context.append({"role": "assistant", "content": assistant_message})
-        except Exception as e:
-            print("Service temporarily unavailable:", e)
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.reply_to(message, "👋 Привет! Отправьте мне изображение номерного знака, и я распознаю его текст.")
 
 
-# Завдання 4: Чат з настроюваним емоційним тоном
-def tone_adjustable_chat(api_key):
-    openai.api_key = api_key
-    tone = "friendly"
-    dialog_context = [{"role": "system", "content": f"Respond in a {tone} tone."}]
-
-    while True:
-        user_input = input("User: ")
-        if user_input.startswith("/set_tone"):
-            tone = user_input.split()[1]
-            dialog_context = [{"role": "system", "content": f"Respond in a {tone} tone."}]
-            print(f"Tone set to {tone}.")
-            continue
-        elif user_input.lower() == "exit":
-            print("Exiting the chat.")
-            break
-
-        dialog_context.append({"role": "user", "content": user_input})
-
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=dialog_context
-            )
-            assistant_message = response.choices[0].message['content']
-            print("Assistant:", assistant_message)
-
-            dialog_context.append({"role": "assistant", "content": assistant_message})
-        except Exception as e:
-            print("Service temporarily unavailable:", e)
-
-
-# Завдання 5: Інтелектуальний пошуковий чат
-def intelligent_search_chat(api_key, articles):
-    openai.api_key = api_key
-
-    def get_relevant_article(query):
-        return next((article for article in articles if query.lower() in article.lower()), "")
-
-    while True:
-        user_input = input("User: ")
-        if user_input.lower() == "exit":
-            print("Exiting the chat.")
-            break
-
-        relevant_content = get_relevant_article(user_input)
-        dialog_context = [{"role": "system", "content": f"Use the following context to answer: {relevant_content}"}]
-
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=dialog_context + [{"role": "user", "content": user_input}]
-            )
-            assistant_message = response.choices[0].message['content']
-            print("Assistant:", assistant_message)
-        except Exception as e:
-            print("Service temporarily unavailable:", e)
-
-
-# Завдання 6: Обробка помилок
-def robust_api_call(api_key, dialog_context):
-    openai.api_key = api_key
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message):
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=dialog_context
-        )
-        return response.choices[0].message['content']
-    except openai.error.OpenAIError as e:
-        print("Error:", e)
+
+        file_info = bot.get_file(message.photo[-1].file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+
+
+        image_path = "temp_image.jpg"
+        with open(image_path, 'wb') as new_file:
+            new_file.write(downloaded_file)
+
+
+        result_text = recognize_with_easyocr(image_path)
+
+
+        bot.reply_to(message, f"🔍 Распознанный текст:\n{result_text}")
+
+
+        os.remove(image_path)
     except Exception as e:
-        print("Service temporarily unavailable:", e)
+        bot.reply_to(message, f"❌ Произошла ошибка: {str(e)}")
 
 
-# Завдання 7: Генерація зображень
-def generate_image(api_key, prompt):
-    openai.api_key = api_key
-    try:
-        response = openai.Image.create(prompt=prompt, size="1024x1024", n=1)
-        print("Image URL:", response['data'][0]['url'])
-    except openai.error.OpenAIError as e:
-        print("Error generating image:", e)
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    bot.reply_to(message, "📸 Пожалуйста, отправьте мне изображение номерного знака.")
 
 
-# Завдання 8: Транскрипція аудіо
-def transcribe_audio(api_key, audio_file_path):
-    openai.api_key = api_key
-    try:
-        with open(audio_file_path, "rb") as audio_file:
-            response = openai.Audio.transcribe("whisper-1", audio_file)
-        print("Transcription:", response['text'])
-    except openai.error.OpenAIError as e:
-        print("Error transcribing audio:", e)
+print("Бот запущен...")
+bot.polling()
 
-# Приклад запуску основних функцій
-if __name__ == "__main__":
-    api_key = ""  # Вставте свій API-ключ
+
+
+
 
