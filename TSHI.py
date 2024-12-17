@@ -1,231 +1,363 @@
-import telebot
-from telebot import types
-import sqlite3
-import webbrowser
-
-import requests
-import wikipedia
-
-TOKEN = '7883357675:AAFFUWtWfaApXZJ17j0X_TtsDrbpYb6wfCI'
-bot = telebot.TeleBot(TOKEN)
-
-# Підключення до бази даних
-conn = sqlite3.connect('TSHI.db', check_same_thread=False)
-cursor = conn.cursor()
-
-# Функція для перевірки та створення таблиці, якщо її не існує
-def check_and_create_table():
-    try:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS Product_list (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Product_name TEXT NOT NULL,
-                Type_Product TEXT NOT NULL
-            );
-        """)
-        conn.commit()
-    except sqlite3.Error as e:
-        print(f"Помилка при створенні таблиці: {e}")
-
-# Головне меню
-def main_menu():
-    menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    menu.add(types.KeyboardButton("Замовлення продуктів"))
-    menu.add(types.KeyboardButton("Розміщення магазинів на мапі"))
-    menu.add(types.KeyboardButton("Акційні пропозиції"))
-    menu.add(types.KeyboardButton("Підписка на акційні пропозиції"))
-    menu.add(types.KeyboardButton("Додавання продуктів"))
-    menu.add(types.KeyboardButton("Перегляд фруктів"))
-    # menu.add(types.KeyboardButton("Погода"))
-    # menu.add(types.KeyboardButton("Пошук у Вікіпедії"))
-    return menu
-
-@bot.message_handler(func=lambda message: message.text == "Замовлення продуктів")
-def order(message):
-    menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    menu.add('Фрукти', 'Овочі', 'Молочні продукти')
-    bot.send_message(message.chat.id, "Яку категорію продуктів ви хочете замовити?", reply_markup=menu)
-
-@bot.message_handler(func=lambda message: message.text in ['Фрукти', 'Овочі', 'Молочні продукти'])
-def show_products(message):
-    product_type = message.text
-    try:
-        cursor.execute("SELECT id, Product_name FROM Product_list WHERE Type_Product = ?", (product_type,))
-        products = cursor.fetchall()
-        if products:
-            response = f"Список {product_type.lower()}:\n" + "\n".join([f"{row[0]}. {row[1]}" for row in products])
-        else:
-            response = f"У базі даних немає {product_type.lower()}."
-        bot.send_message(message.chat.id, response, reply_markup=main_menu())
-    except sqlite3.Error as e:
-        bot.send_message(message.chat.id, f"Сталася помилка при отриманні даних: {e}")
-
-
-@bot.message_handler(func=lambda message: message.text == "Розміщення магазинів на мапі")
-def map(message):
-    try:
-        with open("map.jpg", "rb") as photo:
-            bot.send_photo(message.chat.id, photo, caption="Ось розміщення наших магазинів")
-    except FileNotFoundError:
-        bot.send_message(message.chat.id, "Файл map.jpg не знайдено. Перевірте шлях до зображення.")
-
-@bot.message_handler(func=lambda message: message.text == "Акційні пропозиції")
-def sale(message):
-    bot.send_message(message.chat.id, "Ось список акційних пропозицій на цьому тижні:.")
-
-
-@bot.message_handler(func=lambda message: message.text == "Підписка на акційні пропозиції")
-def sale_subs(message):
-    bot.send_message(message.chat.id, "Введіть вашу електронну пошту для підписки:")
-    bot.register_next_step_handler(message, process_email)
-
-def process_email(message):
-    email = message.text
-    # Логіка перевірки або збереження електронної пошти
-    bot.send_message(message.chat.id, f"На вашу електронну пошту {email} надіслано тестове повідомлення.")
-    bot.send_message(message.chat.id, "Підписка оформлена. Дякую за використання нашого магазину!", reply_markup=main_menu())
-
-@bot.message_handler(commands=['website'])
-def open_website(message):
-    bot.send_message(message.chat.id, "Відкриваю вебсайт...")
-    webbrowser.open('https://www.metro.ua/')  # Замініть на URL вашого сайту
-
-@bot.message_handler(commands=['inform'])
-def inform(message):
-    keyboard = types.InlineKeyboardMarkup()
-    button = types.InlineKeyboardButton("Отримати фото котика", callback_data="send_cat")
-    keyboard.add(button)
-    bot.send_message(
-        message.chat.id,
-        "Тестова функція надсилання фотографії в чаті.",
-        reply_markup=keyboard
-    )
-
-@bot.callback_query_handler(func=lambda call: call.data == "send_cat")
-def send_cat(call):
-    try:
-        with open("cat.jpg", "rb") as photo:
-            bot.send_photo(call.message.chat.id, photo, caption="Ось ваш кіт!")
-    except FileNotFoundError:
-        bot.send_message(call.message.chat.id, "Файл cat.jpg не знайдено. Перевірте шлях до файлу.")
-
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.send_message(
-        message.chat.id,
-        "Ласкаво просимо до сервісу замовлення продуктових товарів!\n/help - Для отримання списку команд\nОберіть послугу:",
-        reply_markup=main_menu()
-    )
-
-@bot.message_handler(func=lambda message: message.text == 'Додавання продуктів')
-def register_prod(message):
-    menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    menu.add(types.KeyboardButton("Повернутися в головне меню"))
-    bot.send_message(message.chat.id, "Введіть назву продукту:", reply_markup=menu)
-    bot.register_next_step_handler(message, get_product_name)
-
-def get_product_name(message):
-    product_name = message.text
-
-    menu = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    menu.add('Овочі', 'Молочні продукти', 'Фрукти')
-    bot.send_message(message.chat.id, "Виберіть тип продукту:", reply_markup=menu)
-    bot.register_next_step_handler(message, get_product_type, product_name)
-
-def get_product_type(message, product_name):
-    product_type = message.text
-    if product_type not in ['Овочі', 'Молочні продукти', 'Фрукти']:
-        bot.send_message(message.chat.id, "Невірний тип продукту. Спробуйте ще раз.", reply_markup=main_menu())
-        return
-    try:
-        # Додавання продукту до бази даних
-        cursor.execute("INSERT INTO Product_list (Product_name, Type_Product) VALUES (?, ?)", (product_name, product_type))
-        conn.commit()
-        bot.send_message(message.chat.id, f"Продукт '{product_name}' додано до бази даних як '{product_type}'.", reply_markup=main_menu())
-    except sqlite3.Error as e:
-        bot.send_message(message.chat.id, f"Сталася помилка при додаванні до бази даних: {e}")
-
-@bot.message_handler(func=lambda message: message.text == 'Перегляд фруктів')
-def view_fruits(message):
-    try:
-        cursor.execute("SELECT id, Product_name FROM Product_list WHERE Type_Product = ?", ('Фрукти',))
-        fruits = cursor.fetchall()
-        if fruits:
-            response = "Список фруктів:\n" + "\n".join([f"{row[0]}. {row[1]}" for row in fruits])
-        else:
-            response = "Фрукти не знайдені в базі даних."
-        bot.send_message(message.chat.id, response, reply_markup=main_menu())
-    except sqlite3.Error as e:
-        bot.send_message(message.chat.id, f"Сталася помилка при отриманні даних: {e}")
-
-@bot.message_handler(func=lambda message: message.text == "Повернутися в головне меню")
-def return_to_main_menu(message):
-    bot.send_message(message.chat.id, "Повернення до головного меню.", reply_markup=main_menu())
-
-@bot.message_handler(commands=['help'])
-def help_command(message):
-    bot.send_message(
-        message.chat.id,
-        "Ось список команд:\n/start - Почати роботу з ботом\n/website - Сайт магазину\n/inform - Тестові функції"
-    )
-
-
-
-
-#Практ_2
-# @bot.message_handler(func=lambda message: message.text == "Погода")
-# def weather_menu(message):
+# import telebot
+# from telebot import types
+# import sqlite3
+# import webbrowser
+#
+# import requests
+# import wikipedia
+#
+# TOKEN = '7883357675:AAFFUWtWfaApXZJ17j0X_TtsDrbpYb6wfCI'
+# bot = telebot.TeleBot(TOKEN)
+#
+# # Підключення до бази даних
+# conn = sqlite3.connect('TSHI.db', check_same_thread=False)
+# cursor = conn.cursor()
+#
+# # Функція для перевірки та створення таблиці, якщо її не існує
+# def check_and_create_table():
+#     try:
+#         cursor.execute("""
+#             CREATE TABLE IF NOT EXISTS Product_list (
+#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 Product_name TEXT NOT NULL,
+#                 Type_Product TEXT NOT NULL
+#             );
+#         """)
+#         conn.commit()
+#     except sqlite3.Error as e:
+#         print(f"Помилка при створенні таблиці: {e}")
+#
+# # Головне меню
+# def main_menu():
 #     menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     menu.add("Kyiv", "Lviv", "Odessa")
-#     menu.add("Повернутися в головне меню")
-#     bot.send_message(message.chat.id, "Виберіть місто для отримання погоди:", reply_markup=menu)
+#     menu.add(types.KeyboardButton("Замовлення продуктів"))
+#     menu.add(types.KeyboardButton("Розміщення магазинів на мапі"))
+#     menu.add(types.KeyboardButton("Акційні пропозиції"))
+#     menu.add(types.KeyboardButton("Підписка на акційні пропозиції"))
+#     menu.add(types.KeyboardButton("Додавання продуктів"))
+#     menu.add(types.KeyboardButton("Перегляд фруктів"))
+#     return menu
 #
-# @bot.message_handler(func=lambda message: message.text in ["Kyiv", "Lviv", "Odessa"])
-# def get_weather(message):
-#     city = message.text
+# @bot.message_handler(func=lambda message: message.text == "Замовлення продуктів")
+# def order(message):
+#     menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#     menu.add('Фрукти', 'Овочі', 'Молочні продукти')
+#     bot.send_message(message.chat.id, "Яку категорію продуктів ви хочете замовити?", reply_markup=menu)
+
+# @bot.message_handler(func=lambda message: message.text in ['Фрукти', 'Овочі', 'Молочні продукти'])
+# def show_products(message):
+#     product_type = message.text
 #     try:
-#         response = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={'a3b896fb6836a77af72ee79c5b062c4e'}&units=metric&lang=ua")
-#         weather_data = response.json()
-#         if response.status_code == 200:
-#             weather_info = (
-#                 f"Погода у місті {city}:\n"
-#                 f"Температура: {weather_data['main']['temp']}°C\n"
-#                 f"Відчувається як: {weather_data['main']['feels_like']}°C\n"
-#                 f"Опис: {weather_data['weather'][0]['description']}\n"
-#                 f"Вологість: {weather_data['main']['humidity']}%\n"
-#                 f"Швидкість вітру: {weather_data['wind']['speed']} м/с"
-#             )
+#         cursor.execute("SELECT id, Product_name FROM Product_list WHERE Type_Product = ?", (product_type,))
+#         products = cursor.fetchall()
+#         if products:
+#             response = f"Список {product_type.lower()}:\n" + "\n".join([f"{row[0]}. {row[1]}" for row in products])
 #         else:
-#             weather_info = "Не вдалося отримати дані про погоду. Перевірте назву міста."
-#         bot.send_message(message.chat.id, weather_info, reply_markup=main_menu())
-#     except Exception as e:
-#         bot.send_message(message.chat.id, f"Сталася помилка: {e}", reply_markup=main_menu())
+#             response = f"У базі даних немає {product_type.lower()}."
+#         bot.send_message(message.chat.id, response, reply_markup=main_menu())
+#     except sqlite3.Error as e:
+#         bot.send_message(message.chat.id, f"Сталася помилка при отриманні даних: {e}")
 #
-# @bot.message_handler(func=lambda message: message.text == "Пошук у Вікіпедії")
-# def wikipedia_search(message):
-#     bot.send_message(message.chat.id, "Введіть запит для пошуку у Вікіпедії:")
-#     bot.register_next_step_handler(message, search_wikipedia)
 #
-# def search_wikipedia(message):
-#     query = message.text
+# @bot.message_handler(func=lambda message: message.text == "Розміщення магазинів на мапі")
+# def map(message):
 #     try:
-#         wikipedia.set_lang("uk")
-#         page = wikipedia.page(query)
-#         summary = wikipedia.summary(query, sentences=3)
-#         response = (
-#             f"<b>{page.title}</b>\n\n"
-#             f"{summary}\n\n"
-#             f"Детальніше: {page.url}"
-#         )
-#         bot.send_message(message.chat.id, response, parse_mode="HTML", reply_markup=main_menu())
-#     except wikipedia.exceptions.PageError:
-#         bot.send_message(message.chat.id, "Не вдалося знайти статтю. Спробуйте інший запит.", reply_markup=main_menu())
-#     except Exception as e:
-#         bot.send_message(message.chat.id, f"Сталася помилка: {e}", reply_markup=main_menu())
+#         with open("map.jpg", "rb") as photo:
+#             bot.send_photo(message.chat.id, photo, caption="Ось розміщення наших магазинів")
+#     except FileNotFoundError:
+#         bot.send_message(message.chat.id, "Файл map.jpg не знайдено. Перевірте шлях до зображення.")
+#
+# @bot.message_handler(func=lambda message: message.text == "Акційні пропозиції")
+# def sale(message):
+#     bot.send_message(message.chat.id, "Ось список акційних пропозицій на цьому тижні:.")
+#
+#
+# @bot.message_handler(func=lambda message: message.text == "Підписка на акційні пропозиції")
+# def sale_subs(message):
+#     bot.send_message(message.chat.id, "Введіть вашу електронну пошту для підписки:")
+#     bot.register_next_step_handler(message, process_email)
+#
+# def process_email(message):
+#     email = message.text
+#     # Логіка перевірки або збереження електронної пошти
+#     bot.send_message(message.chat.id, f"На вашу електронну пошту {email} надіслано тестове повідомлення.")
+#     bot.send_message(message.chat.id, "Підписка оформлена. Дякую за використання нашого магазину!", reply_markup=main_menu())
+#
+# @bot.message_handler(commands=['website'])
+# def open_website(message):
+#     bot.send_message(message.chat.id, "Відкриваю вебсайт...")
+#     webbrowser.open('https://www.metro.ua/')  # Замініть на URL вашого сайту
+#
+# @bot.message_handler(commands=['inform'])
+# def inform(message):
+#     keyboard = types.InlineKeyboardMarkup()
+#     button = types.InlineKeyboardButton("Отримати фото котика", callback_data="send_cat")
+#     keyboard.add(button)
+#     bot.send_message(
+#         message.chat.id,
+#         "Тестова функція надсилання фотографії в чаті.",
+#         reply_markup=keyboard
+#     )
+#
+# @bot.callback_query_handler(func=lambda call: call.data == "send_cat")
+# def send_cat(call):
+#     try:
+#         with open("cat.jpg", "rb") as photo:
+#             bot.send_photo(call.message.chat.id, photo, caption="Ось ваш кіт!")
+#     except FileNotFoundError:
+#         bot.send_message(call.message.chat.id, "Файл cat.jpg не знайдено. Перевірте шлях до файлу.")
+#
+# @bot.message_handler(commands=['start'])
+# def start(message):
+#     bot.send_message(
+#         message.chat.id,
+#         "Ласкаво просимо до сервісу замовлення продуктових товарів!\n/help - Для отримання списку команд\nОберіть послугу:",
+#         reply_markup=main_menu()
+#     )
+#
+# @bot.message_handler(func=lambda message: message.text == 'Додавання продуктів')
+# def register_prod(message):
+#     menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#     menu.add(types.KeyboardButton("Повернутися в головне меню"))
+#     bot.send_message(message.chat.id, "Введіть назву продукту:", reply_markup=menu)
+#     bot.register_next_step_handler(message, get_product_name)
+#
+# def get_product_name(message):
+#     product_name = message.text
+#
+#     menu = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+#     menu.add('Овочі', 'Молочні продукти', 'Фрукти')
+#     bot.send_message(message.chat.id, "Виберіть тип продукту:", reply_markup=menu)
+#     bot.register_next_step_handler(message, get_product_type, product_name)
+#
+# def get_product_type(message, product_name):
+#     product_type = message.text
+#     if product_type not in ['Овочі', 'Молочні продукти', 'Фрукти']:
+#         bot.send_message(message.chat.id, "Невірний тип продукту. Спробуйте ще раз.", reply_markup=main_menu())
+#         return
+#     try:
+#         # Додавання продукту до бази даних
+#         cursor.execute("INSERT INTO Product_list (Product_name, Type_Product) VALUES (?, ?)", (product_name, product_type))
+#         conn.commit()
+#         bot.send_message(message.chat.id, f"Продукт '{product_name}' додано до бази даних як '{product_type}'.", reply_markup=main_menu())
+#     except sqlite3.Error as e:
+#         bot.send_message(message.chat.id, f"Сталася помилка при додаванні до бази даних: {e}")
+#
+# @bot.message_handler(func=lambda message: message.text == 'Перегляд фруктів')
+# def view_fruits(message):
+#     try:
+#         cursor.execute("SELECT id, Product_name FROM Product_list WHERE Type_Product = ?", ('Фрукти',))
+#         fruits = cursor.fetchall()
+#         if fruits:
+#             response = "Список фруктів:\n" + "\n".join([f"{row[0]}. {row[1]}" for row in fruits])
+#         else:
+#             response = "Фрукти не знайдені в базі даних."
+#         bot.send_message(message.chat.id, response, reply_markup=main_menu())
+#     except sqlite3.Error as e:
+#         bot.send_message(message.chat.id, f"Сталася помилка при отриманні даних: {e}")
+#
+# @bot.message_handler(func=lambda message: message.text == "Повернутися в головне меню")
+# def return_to_main_menu(message):
+#     bot.send_message(message.chat.id, "Повернення до головного меню.", reply_markup=main_menu())
+#
+# @bot.message_handler(commands=['help'])
+# def help_command(message):
+#     bot.send_message(
+#         message.chat.id,
+#         "Ось список команд:\n/start - Почати роботу з ботом\n/website - Сайт магазину\n/inform - Тестові функції"
+#     )
+#
+#
+#
+# # Перевірка бази даних і запуск бота
+# if __name__ == "__main__":
+#     check_and_create_table()
+#     print("База даних перевірена. Бот готовий до запуску.")
+#     bot.polling(none_stop=True)
 
 
-# Перевірка бази даних і запуск бота
+import openai
+
+
+# Завдання 1: Базовий діалог із ChatGPT з контекстом
+def basic_dialog_with_context(api_key):
+    openai.api_key = api_key
+    dialog_context = [{"role": "system", "content": "You are ChatGPT, a helpful assistant."}]
+
+    while True:
+        user_input = input("User: ")
+        if user_input.lower() == "exit":
+            print("Exiting the chat.")
+            break
+
+        dialog_context.append({"role": "user", "content": user_input})
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=dialog_context
+            )
+            assistant_message = response.choices[0].message['content']
+            print("Assistant:", assistant_message)
+
+            dialog_context.append({"role": "assistant", "content": assistant_message})
+        except Exception as e:
+            print("Service temporarily unavailable:", e)
+
+
+# Завдання 2: Система з обмеженим контекстом
+def limited_context_chat(api_key):
+    openai.api_key = api_key
+    dialog_context = [{"role": "system", "content": "You are a limited context assistant."}]
+
+    while True:
+        user_input = input("User: ")
+        if user_input.lower() == "exit":
+            print("Exiting the chat.")
+            break
+
+        dialog_context.append({"role": "user", "content": user_input})
+
+        if len(dialog_context) > 6:
+            dialog_context = dialog_context[-6:]
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=dialog_context
+            )
+            assistant_message = response.choices[0].message['content']
+            print("Assistant:", assistant_message)
+
+            dialog_context.append({"role": "assistant", "content": assistant_message})
+        except Exception as e:
+            print("Service temporarily unavailable:", e)
+
+
+# Завдання 3: Чат-бот для технічної підтримки
+def tech_support_chat(api_key):
+    openai.api_key = api_key
+    dialog_context = [{"role": "system", "content": "You are a support assistant specializing in outerwear orders."}]
+
+    while True:
+        user_input = input("User: ")
+        if user_input.lower() == "exit":
+            print("Exiting the chat.")
+            break
+
+        dialog_context.append({"role": "user", "content": user_input})
+
+        if len(dialog_context) > 10:
+            dialog_context = dialog_context[-10:]
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=dialog_context
+            )
+            assistant_message = response.choices[0].message['content']
+            print("Assistant:", assistant_message)
+
+            dialog_context.append({"role": "assistant", "content": assistant_message})
+        except Exception as e:
+            print("Service temporarily unavailable:", e)
+
+
+# Завдання 4: Чат з настроюваним емоційним тоном
+def tone_adjustable_chat(api_key):
+    openai.api_key = api_key
+    tone = "friendly"
+    dialog_context = [{"role": "system", "content": f"Respond in a {tone} tone."}]
+
+    while True:
+        user_input = input("User: ")
+        if user_input.startswith("/set_tone"):
+            tone = user_input.split()[1]
+            dialog_context = [{"role": "system", "content": f"Respond in a {tone} tone."}]
+            print(f"Tone set to {tone}.")
+            continue
+        elif user_input.lower() == "exit":
+            print("Exiting the chat.")
+            break
+
+        dialog_context.append({"role": "user", "content": user_input})
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=dialog_context
+            )
+            assistant_message = response.choices[0].message['content']
+            print("Assistant:", assistant_message)
+
+            dialog_context.append({"role": "assistant", "content": assistant_message})
+        except Exception as e:
+            print("Service temporarily unavailable:", e)
+
+
+# Завдання 5: Інтелектуальний пошуковий чат
+def intelligent_search_chat(api_key, articles):
+    openai.api_key = api_key
+
+    def get_relevant_article(query):
+        return next((article for article in articles if query.lower() in article.lower()), "")
+
+    while True:
+        user_input = input("User: ")
+        if user_input.lower() == "exit":
+            print("Exiting the chat.")
+            break
+
+        relevant_content = get_relevant_article(user_input)
+        dialog_context = [{"role": "system", "content": f"Use the following context to answer: {relevant_content}"}]
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=dialog_context + [{"role": "user", "content": user_input}]
+            )
+            assistant_message = response.choices[0].message['content']
+            print("Assistant:", assistant_message)
+        except Exception as e:
+            print("Service temporarily unavailable:", e)
+
+
+# Завдання 6: Обробка помилок
+def robust_api_call(api_key, dialog_context):
+    openai.api_key = api_key
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=dialog_context
+        )
+        return response.choices[0].message['content']
+    except openai.error.OpenAIError as e:
+        print("Error:", e)
+    except Exception as e:
+        print("Service temporarily unavailable:", e)
+
+
+# Завдання 7: Генерація зображень
+def generate_image(api_key, prompt):
+    openai.api_key = api_key
+    try:
+        response = openai.Image.create(prompt=prompt, size="1024x1024", n=1)
+        print("Image URL:", response['data'][0]['url'])
+    except openai.error.OpenAIError as e:
+        print("Error generating image:", e)
+
+
+# Завдання 8: Транскрипція аудіо
+def transcribe_audio(api_key, audio_file_path):
+    openai.api_key = api_key
+    try:
+        with open(audio_file_path, "rb") as audio_file:
+            response = openai.Audio.transcribe("whisper-1", audio_file)
+        print("Transcription:", response['text'])
+    except openai.error.OpenAIError as e:
+        print("Error transcribing audio:", e)
+
+# Приклад запуску основних функцій
 if __name__ == "__main__":
-    check_and_create_table()
-    print("База даних перевірена. Бот готовий до запуску.")
-    bot.polling(none_stop=True)
+    api_key = ""  # Вставте свій API-ключ
+
