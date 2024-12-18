@@ -1,233 +1,216 @@
-# import telebot
-# from telebot import types
-# import sqlite3
-# import webbrowser
-#
-# import requests
-# import wikipedia
-#
-# TOKEN = '7883357675:AAFFUWtWfaApXZJ17j0X_TtsDrbpYb6wfCI'
-# bot = telebot.TeleBot(TOKEN)
-#
-# # Підключення до бази даних
-# conn = sqlite3.connect('TSHI.db', check_same_thread=False)
-# cursor = conn.cursor()
-#
-# # Функція для перевірки та створення таблиці, якщо її не існує
-# def check_and_create_table():
-#     try:
-#         cursor.execute("""
-#             CREATE TABLE IF NOT EXISTS Product_list (
-#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-#                 Product_name TEXT NOT NULL,
-#                 Type_Product TEXT NOT NULL
-#             );
-#         """)
-#         conn.commit()
-#     except sqlite3.Error as e:
-#         print(f"Помилка при створенні таблиці: {e}")
-#
-# # Головне меню
-# def main_menu():
-#     menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     menu.add(types.KeyboardButton("Замовлення продуктів"))
-#     menu.add(types.KeyboardButton("Розміщення магазинів на мапі"))
-#     menu.add(types.KeyboardButton("Акційні пропозиції"))
-#     menu.add(types.KeyboardButton("Підписка на акційні пропозиції"))
-#     menu.add(types.KeyboardButton("Додавання продуктів"))
-#     menu.add(types.KeyboardButton("Перегляд фруктів"))
-#     return menu
-#
-# @bot.message_handler(func=lambda message: message.text == "Замовлення продуктів")
-# def order(message):
-#     menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     menu.add('Фрукти', 'Овочі', 'Молочні продукти')
-#     bot.send_message(message.chat.id, "Яку категорію продуктів ви хочете замовити?", reply_markup=menu)
+import speech_recognition as sr
+import pyttsx3
+from transformers import pipeline
 
-# @bot.message_handler(func=lambda message: message.text in ['Фрукти', 'Овочі', 'Молочні продукти'])
-# def show_products(message):
-#     product_type = message.text
-#     try:
-#         cursor.execute("SELECT id, Product_name FROM Product_list WHERE Type_Product = ?", (product_type,))
-#         products = cursor.fetchall()
-#         if products:
-#             response = f"Список {product_type.lower()}:\n" + "\n".join([f"{row[0]}. {row[1]}" for row in products])
-#         else:
-#             response = f"У базі даних немає {product_type.lower()}."
-#         bot.send_message(message.chat.id, response, reply_markup=main_menu())
-#     except sqlite3.Error as e:
-#         bot.send_message(message.chat.id, f"Сталася помилка при отриманні даних: {e}")
-#
-#
-# @bot.message_handler(func=lambda message: message.text == "Розміщення магазинів на мапі")
-# def map(message):
-#     try:
-#         with open("map.jpg", "rb") as photo:
-#             bot.send_photo(message.chat.id, photo, caption="Ось розміщення наших магазинів")
-#     except FileNotFoundError:
-#         bot.send_message(message.chat.id, "Файл map.jpg не знайдено. Перевірте шлях до зображення.")
-#
-# @bot.message_handler(func=lambda message: message.text == "Акційні пропозиції")
-# def sale(message):
-#     bot.send_message(message.chat.id, "Ось список акційних пропозицій на цьому тижні:.")
-#
-#
-# @bot.message_handler(func=lambda message: message.text == "Підписка на акційні пропозиції")
-# def sale_subs(message):
-#     bot.send_message(message.chat.id, "Введіть вашу електронну пошту для підписки:")
-#     bot.register_next_step_handler(message, process_email)
-#
-# def process_email(message):
-#     email = message.text
-#     # Логіка перевірки або збереження електронної пошти
-#     bot.send_message(message.chat.id, f"На вашу електронну пошту {email} надіслано тестове повідомлення.")
-#     bot.send_message(message.chat.id, "Підписка оформлена. Дякую за використання нашого магазину!", reply_markup=main_menu())
-#
-# @bot.message_handler(commands=['website'])
-# def open_website(message):
-#     bot.send_message(message.chat.id, "Відкриваю вебсайт...")
-#     webbrowser.open('https://www.metro.ua/')  # Замініть на URL вашого сайту
-#
-# @bot.message_handler(commands=['inform'])
-# def inform(message):
-#     keyboard = types.InlineKeyboardMarkup()
-#     button = types.InlineKeyboardButton("Отримати фото котика", callback_data="send_cat")
-#     keyboard.add(button)
-#     bot.send_message(
-#         message.chat.id,
-#         "Тестова функція надсилання фотографії в чаті.",
-#         reply_markup=keyboard
-#     )
-#
-# @bot.callback_query_handler(func=lambda call: call.data == "send_cat")
-# def send_cat(call):
-#     try:
-#         with open("cat.jpg", "rb") as photo:
-#             bot.send_photo(call.message.chat.id, photo, caption="Ось ваш кіт!")
-#     except FileNotFoundError:
-#         bot.send_message(call.message.chat.id, "Файл cat.jpg не знайдено. Перевірте шлях до файлу.")
-#
-# @bot.message_handler(commands=['start'])
-# def start(message):
-#     bot.send_message(
-#         message.chat.id,
-#         "Ласкаво просимо до сервісу замовлення продуктових товарів!\n/help - Для отримання списку команд\nОберіть послугу:",
-#         reply_markup=main_menu()
-#     )
-#
-# @bot.message_handler(func=lambda message: message.text == 'Додавання продуктів')
-# def register_prod(message):
-#     menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     menu.add(types.KeyboardButton("Повернутися в головне меню"))
-#     bot.send_message(message.chat.id, "Введіть назву продукту:", reply_markup=menu)
-#     bot.register_next_step_handler(message, get_product_name)
-#
-# def get_product_name(message):
-#     product_name = message.text
-#
-#     menu = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-#     menu.add('Овочі', 'Молочні продукти', 'Фрукти')
-#     bot.send_message(message.chat.id, "Виберіть тип продукту:", reply_markup=menu)
-#     bot.register_next_step_handler(message, get_product_type, product_name)
-#
-# def get_product_type(message, product_name):
-#     product_type = message.text
-#     if product_type not in ['Овочі', 'Молочні продукти', 'Фрукти']:
-#         bot.send_message(message.chat.id, "Невірний тип продукту. Спробуйте ще раз.", reply_markup=main_menu())
-#         return
-#     try:
-#         # Додавання продукту до бази даних
-#         cursor.execute("INSERT INTO Product_list (Product_name, Type_Product) VALUES (?, ?)", (product_name, product_type))
-#         conn.commit()
-#         bot.send_message(message.chat.id, f"Продукт '{product_name}' додано до бази даних як '{product_type}'.", reply_markup=main_menu())
-#     except sqlite3.Error as e:
-#         bot.send_message(message.chat.id, f"Сталася помилка при додаванні до бази даних: {e}")
-#
-# @bot.message_handler(func=lambda message: message.text == 'Перегляд фруктів')
-# def view_fruits(message):
-#     try:
-#         cursor.execute("SELECT id, Product_name FROM Product_list WHERE Type_Product = ?", ('Фрукти',))
-#         fruits = cursor.fetchall()
-#         if fruits:
-#             response = "Список фруктів:\n" + "\n".join([f"{row[0]}. {row[1]}" for row in fruits])
-#         else:
-#             response = "Фрукти не знайдені в базі даних."
-#         bot.send_message(message.chat.id, response, reply_markup=main_menu())
-#     except sqlite3.Error as e:
-#         bot.send_message(message.chat.id, f"Сталася помилка при отриманні даних: {e}")
-#
-# @bot.message_handler(func=lambda message: message.text == "Повернутися в головне меню")
-# def return_to_main_menu(message):
-#     bot.send_message(message.chat.id, "Повернення до головного меню.", reply_markup=main_menu())
-#
-# @bot.message_handler(commands=['help'])
-# def help_command(message):
-#     bot.send_message(
-#         message.chat.id,
-#         "Ось список команд:\n/start - Почати роботу з ботом\n/website - Сайт магазину\n/inform - Тестові функції"
-#     )
-#
-#
-#
-# # Перевірка бази даних і запуск бота
-# if __name__ == "__main__":
-#     check_and_create_table()
-#     print("База даних перевірена. Бот готовий до запуску.")
-#     bot.polling(none_stop=True)
+# 1. Налаштування синтезатора мовлення (TTS)
+engine = pyttsx3.init()
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
 
+# 2. Налаштування розпізнавання мови (ASR)
+recognizer = sr.Recognizer()
+def recognize_speech():
+    with sr.Microphone() as source:
+        print("Слухаю... Говоріть:")
+        try:
+            audio = recognizer.listen(source, timeout=5)
+            text = recognizer.recognize_google(audio, language="uk-UA")
+            print(f"Ви сказали: {text}")
+            return text
+        except sr.UnknownValueError:
+            print("Не вдалося розпізнати мову.")
+            speak("Не вдалося розпізнати мову. Спробуйте ще раз.")
+        except sr.RequestError as e:
+            print("Помилка сервісу: {0}".format(e))
+            speak("Помилка сервісу. Перевірте інтернет-з'єднання.")
+        return ""
 
-import numpy as np
-import skfuzzy as fuzz
-import skfuzzy.control as ctrl
-import matplotlib.pyplot as plt
+# 3. Налаштування NLP для розпізнавання намірів
+qa_model = pipeline("question-answering", model="distilbert-base-cased-distilled-squad")
+def get_response(question, context):
+    try:
+        result = qa_model(question=question, context=context)
+        return result["answer"]
+    except Exception as e:
+        print(f"Помилка NLP: {e}")
+        return "На жаль, я не зміг знайти відповідь на ваше питання."
 
+# 4. Основний цикл бота
+def main():
+    context = "Голосовий бот для довідки. Ви можете запитати про будь-яку інформацію."  # Можна розширити контекст
+    speak("Привіт! Я ваш голосовий помічник. Чим можу допомогти?")
+    while True:
+        user_input = recognize_speech()
 
-def server_load_distribution(cpu_load, user_count):
+        if not user_input:
+            continue
 
-    cpu = ctrl.Antecedent(np.linspace(0, 100, 100), 'cpu')
-    users = ctrl.Antecedent(np.linspace(0, 100, 100), 'users')
-    servers = ctrl.Consequent(np.linspace(0, 10, 100), 'servers')
+        if "завершити" in user_input.lower():
+            speak("Дякую, що скористалися ботом. До побачення!")
+            break
 
-    cpu['low'] = fuzz.trimf(cpu.universe, [0, 0, 50])
-    cpu['medium'] = fuzz.trimf(cpu.universe, [25, 50, 75])
-    cpu['high'] = fuzz.trimf(cpu.universe, [50, 100, 100])
-
-    users['few'] = fuzz.trimf(users.universe, [0, 0, 50])
-    users['moderate'] = fuzz.trimf(users.universe, [25, 50, 75])
-    users['many'] = fuzz.trimf(users.universe, [50, 100, 100])
-
-    servers['few'] = fuzz.trimf(servers.universe, [0, 0, 5])
-    servers['moderate'] = fuzz.trimf(servers.universe, [3, 5, 7])
-    servers['many'] = fuzz.trimf(servers.universe, [5, 10, 10])
-
-
-    rule1 = ctrl.Rule(cpu['low'] & users['few'], servers['few'])
-    rule2 = ctrl.Rule(cpu['medium'] & users['moderate'], servers['moderate'])
-    rule3 = ctrl.Rule(cpu['high'] | users['many'], servers['many'])
-
-
-    server_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
-    server_sim = ctrl.ControlSystemSimulation(server_ctrl)
-
-
-    server_sim.input['cpu'] = cpu_load
-    server_sim.input['users'] = user_count
-    server_sim.compute()
-
-
-    print(f"\nРозподіл серверів (завантаження CPU: {cpu_load}%, користувачів: {user_count}):")
-    print(f"Кількість запущених серверів: {server_sim.output['servers']:.2f}")
-
-
-    servers.view(sim=server_sim)
-    plt.show()
-
+        response = get_response(user_input, context)
+        print(f"Бот: {response}")
+        speak(response)
 
 if __name__ == "__main__":
+    main()
 
-    cpu_load = float(input("Введіть завантаження CPU (%): "))
-    user_count = float(input("Введіть кількість підключених користувачів (%): "))
-    server_load_distribution(cpu_load, user_count)
+
+import openai
+import telebot
+import pyttsx3
+import threading
+
+# Set your OpenAI API key
+openai.api_key = ''
+
+# Initialize the bot and the speech engine
+bot = telebot.TeleBot('')
+engine = pyttsx3.init()
+
+
+# Generate GPT-3 response
+def generate_gpt_response(text):
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # or "gpt-4"
+            messages=[{"role": "user", "content": text}],
+            max_tokens=150,
+            temperature=0.7
+        )
+        return response['choices'][0]['message']['content'].strip()
+    except openai.OpenAIError as e:
+        print(f"OpenAI API error: {e}")
+        return "Sorry, there was an error with generating the response."
+    except Exception as e:
+        print(f"General error: {e}")
+        return "Sorry, I couldn't generate a response right now."
+
+
+# Speak function
+def speak(text):
+    def run_speech():
+        engine.say(text)
+        engine.runAndWait()
+
+    # Run the speech synthesis in a separate thread
+    speech_thread = threading.Thread(target=run_speech)
+    speech_thread.start()
+
+
+# Handle the message
+@bot.message_handler(func=lambda message: True)
+def respond(message):
+    user_input = message.text
+    print(f"User said: {user_input}")
+    response = generate_gpt_response(user_input)
+    print(f"Bot response: {response}")
+    speak(response)
+    bot.reply_to(message, response)
+
+
+# Start polling
+if __name__ == "__main__":
+    bot.polling()
+
+
+
+
+
+import telebot
+import pyttsx3
+import requests
+import json
+
+# Your Amadeus API key
+amadeus_api_key = ''
+
+# Your OpenWeatherMap API key
+weather_api_key = ''
+
+# Initialize the bot
+bot = telebot.TeleBot('')
+
+# Initialize the text-to-speech engine
+engine = pyttsx3.init()
+
+# Function to speak the response
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
+
+# Command handler
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.reply_to(message, "Hello! How can I assist you today?")
+    speak("Hello! How can I assist you today?")
+
+# Weather request handler
+@bot.message_handler(func=lambda message: message.text.lower() == 'weather')
+def get_weather(message):
+    city = "London"  # Specify the city to check weather
+    weather_url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={weather_api_key}&units=metric'
+
+    weather_response = requests.get(weather_url)
+    if weather_response.status_code == 200:
+        weather_data = weather_response.json()
+        description = weather_data['weather'][0]['description']
+        temp = weather_data['main']['temp']
+        response = f"The weather in {city}: {description}, temperature: {temp}°C."
+        bot.reply_to(message, response)
+        speak(response)
+    else:
+        bot.reply_to(message, "Sorry, I couldn't fetch the weather information.")
+        speak("Sorry, I couldn't fetch the weather information.")
+
+# Travel request handler
+@bot.message_handler(func=lambda message: 'travel' in message.text.lower())
+def search_travel_destinations(message):
+    url = 'https://api.amadeus.com/v2/shopping/flight-offers'
+    headers = {'Authorization': f'Bearer {amadeus_api_key}', 'Content-Type': 'application/json'}
+
+    params = {
+        'origin': 'LON',  # London
+        'destination': 'NYC',  # New York
+        'departureDate': '2024-12-25',  # Departure date
+        'adults': 1  # Number of adults
+    }
+
+    response = requests.get(url, headers=headers, params=params)
+
+    if response.status_code == 200:
+        data = response.json()
+        # Check if there are any results
+        if data.get("data"):
+            offer = data['data'][0]  # Get the first offer
+            price = offer['price']['total']
+            airline = offer['validatingAirlineCodes'][0]  # First airline
+            response = f"Best offer: {price} EUR, airline: {airline}"
+            bot.reply_to(message, response)
+            speak(response)
+        else:
+            bot.reply_to(message, "No travel offers found.")
+            speak("No travel offers found.")
+    else:
+        bot.reply_to(message, "Sorry, I couldn't find any travel offers.")
+        speak("Sorry, I couldn't find any travel offers.")
+
+# Handler for other messages
+@bot.message_handler(func=lambda message: True)
+def respond(message):
+    bot.reply_to(message, "Sorry, I didn't understand your request.")
+    speak("Sorry, I didn't understand your request.")
+
+# Function to start the bot
+def start_bot():
+    bot.polling()
+
+# Start the bot
+if __name__ == '__main__':
+    start_bot()
+
 
 
 
