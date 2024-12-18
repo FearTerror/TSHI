@@ -176,65 +176,131 @@
 #     bot.polling(none_stop=True)
 
 
-import telebot
-import easyocr
-import cv2
-import os
+import numpy as np
+import skfuzzy as fuzz
+import skfuzzy.control as ctrl
+import matplotlib.pyplot as plt
 
 
-TOKEN = '8023381722:AAH0zVK7HNjmWaxX9KkogavDDxz4Asr7XLE'
-bot = telebot.TeleBot(TOKEN)
+def plot_temperature_membership():
+
+    temperature = np.linspace(-10, 50, 100)
+
+    cold = fuzz.trimf(temperature, [-10, -10, 15])
+    moderate = fuzz.trimf(temperature, [10, 25, 40])
+    hot = fuzz.trimf(temperature, [30, 50, 50])
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(temperature, cold, label="Холодно")
+    plt.plot(temperature, moderate, label="Помірно")
+    plt.plot(temperature, hot, label="Спекотно")
+    plt.title("Функції належності для температури")
+    plt.xlabel("Температура (°C)")
+    plt.ylabel("Ступінь належності")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    return temperature, cold, moderate, hot
 
 
-reader = easyocr.Reader(['en', 'uk'])
+def fuzzify_temperature(user_temp, temperature, cold, moderate, hot):
 
-def recognize_with_easyocr(image_path):
-    image = cv2.imread(image_path)
-    image = cv2.resize(image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-    results = reader.readtext(image)
+    cold_level = fuzz.interp_membership(temperature, cold, user_temp)
+    moderate_level = fuzz.interp_membership(temperature, moderate, user_temp)
+    hot_level = fuzz.interp_membership(temperature, hot, user_temp)
 
-    recognized_text = ""
-    for (bbox, text, prob) in results:
-        recognized_text += f"{text} (Вероятность: {prob:.2f})\n"
-    return recognized_text if recognized_text else "Не удалось распознать текст."
-
-
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.reply_to(message, "👋 Привет! Отправьте мне изображение номерного знака, и я распознаю его текст.")
+    print(f"\nТемпература {user_temp}°C:")
+    print(f"  Холодно: {cold_level:.2f}")
+    print(f"  Помірно: {moderate_level:.2f}")
+    print(f"  Спекотно: {hot_level:.2f}")
 
 
-@bot.message_handler(content_types=['photo'])
-def handle_photo(message):
-    try:
+def fan_speed_control(temp, hum):
 
-        file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
-
-
-        image_path = "temp_image.jpg"
-        with open(image_path, 'wb') as new_file:
-            new_file.write(downloaded_file)
+    temperature = ctrl.Antecedent(np.linspace(0, 50, 100), 'temperature')
+    humidity = ctrl.Antecedent(np.linspace(0, 100, 100), 'humidity')
+    fan_speed = ctrl.Consequent(np.linspace(0, 100, 100), 'fan_speed')
 
 
-        result_text = recognize_with_easyocr(image_path)
+    temperature['low'] = fuzz.trimf(temperature.universe, [0, 0, 25])
+    temperature['medium'] = fuzz.trimf(temperature.universe, [15, 25, 35])
+    temperature['high'] = fuzz.trimf(temperature.universe, [30, 50, 50])
+
+    humidity['dry'] = fuzz.trimf(humidity.universe, [0, 0, 50])
+    humidity['normal'] = fuzz.trimf(humidity.universe, [25, 50, 75])
+    humidity['wet'] = fuzz.trimf(humidity.universe, [50, 100, 100])
+
+    fan_speed['low'] = fuzz.trimf(fan_speed.universe, [0, 0, 50])
+    fan_speed['medium'] = fuzz.trimf(fan_speed.universe, [25, 50, 75])
+    fan_speed['high'] = fuzz.trimf(fan_speed.universe, [50, 100, 100])
 
 
-        bot.reply_to(message, f"🔍 Распознанный текст:\n{result_text}")
+    rule1 = ctrl.Rule(temperature['high'] & humidity['wet'], fan_speed['high'])
+    rule2 = ctrl.Rule(temperature['medium'] & humidity['normal'], fan_speed['medium'])
+    rule3 = ctrl.Rule(temperature['low'] | humidity['dry'], fan_speed['low'])
 
 
-        os.remove(image_path)
-    except Exception as e:
-        bot.reply_to(message, f"❌ Произошла ошибка: {str(e)}")
+    fan_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+    fan = ctrl.ControlSystemSimulation(fan_ctrl)
 
 
-@bot.message_handler(func=lambda message: True)
-def echo_all(message):
-    bot.reply_to(message, "📸 Пожалуйста, отправьте мне изображение номерного знака.")
+    fan.input['temperature'] = temp
+    fan.input['humidity'] = hum
+    fan.compute()
+
+    print(f"Швидкість вентилятора (за температури {temp}°C і вологості {hum}%): {fan.output['fan_speed']:.2f}")
 
 
-print("Бот запущен...")
-bot.polling()
+def investment_risk_control(risk, profit):
+
+    market_risk = ctrl.Antecedent(np.linspace(0, 100, 100), 'market_risk')
+    expected_profit = ctrl.Antecedent(np.linspace(0, 100, 100), 'expected_profit')
+    investment_level = ctrl.Consequent(np.linspace(0, 100, 100), 'investment_level')
+
+
+    market_risk['low'] = fuzz.trimf(market_risk.universe, [0, 0, 50])
+    market_risk['medium'] = fuzz.trimf(market_risk.universe, [25, 50, 75])
+    market_risk['high'] = fuzz.trimf(market_risk.universe, [50, 100, 100])
+
+    expected_profit['low'] = fuzz.trimf(expected_profit.universe, [0, 0, 50])
+    expected_profit['medium'] = fuzz.trimf(expected_profit.universe, [25, 50, 75])
+    expected_profit['high'] = fuzz.trimf(expected_profit.universe, [50, 100, 100])
+
+    investment_level['not_recommended'] = fuzz.trimf(investment_level.universe, [0, 0, 50])
+    investment_level['possible'] = fuzz.trimf(investment_level.universe, [25, 50, 75])
+    investment_level['recommended'] = fuzz.trimf(investment_level.universe, [50, 100, 100])
+
+
+    rule1 = ctrl.Rule(market_risk['low'] & expected_profit['high'], investment_level['recommended'])
+    rule2 = ctrl.Rule(market_risk['medium'] & expected_profit['medium'], investment_level['possible'])
+    rule3 = ctrl.Rule(market_risk['high'] | expected_profit['low'], investment_level['not_recommended'])
+
+    investment_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+    investment = ctrl.ControlSystemSimulation(investment_ctrl)
+
+    investment.input['market_risk'] = risk
+    investment.input['expected_profit'] = profit
+    investment.compute()
+
+    print(f"Рівень інвестицій (ризик: {risk}%, прибуток: {profit}%): {investment.output['investment_level']:.2f}")
+
+
+# Основна програма
+if __name__ == "__main__":
+
+    temperature, cold, moderate, hot = plot_temperature_membership()
+    user_temp = float(input("Введіть температуру (°C): "))
+    fuzzify_temperature(user_temp, temperature, cold, moderate, hot)
+
+    temp = float(input("\nВведіть температуру для вентилятора (°C): "))
+    hum = float(input("Введіть вологість (%): "))
+    fan_speed_control(temp, hum)
+
+    risk = float(input("\nВведіть рівень ризику ринку (%): "))
+    profit = float(input("Введіть очікуваний прибуток (%): "))
+    investment_risk_control(risk, profit)
+
 
 
 
